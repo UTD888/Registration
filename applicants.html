@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>รายชื่อผู้สมัคร</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #eee;
+    }
+    h2, h4 {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h2 id="tourName">กำลังโหลดชื่อทัวร์นาเมนต์...</h2>
+  <h4 id="tourDate"></h4>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Status</th>
+        <th>Regiser Time</th>
+      </tr>
+    </thead>
+    <tbody id="applicantTableBody">
+      <tr><td colspan="4">กำลังโหลด...</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAxB3tZKz-WiEI_kqOP5hTA6gVgpznx3ck",
+      authDomain: "registertour-cd779.firebaseapp.com",
+      projectId: "registertour-cd779"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const params = new URLSearchParams(window.location.search);
+    const tourId = params.get("id");
+
+    const tourNameEl = document.getElementById("tourName");
+    const tourDateEl = document.getElementById("tourDate");
+    const tbody = document.getElementById("applicantTableBody");
+
+    async function loadTourInfo() {
+      const doc = await db.collection("tournaments").doc(tourId).get();
+      if (!doc.exists) {
+        tourNameEl.innerText = "ไม่พบข้อมูลทัวร์นาเมนต์";
+        return;
+      }
+
+      const data = doc.data();
+      tourNameEl.innerText = data.name || "ไม่ทราบชื่อ";
+      const date = data.playDate?.toDate?.();
+      if (date) {
+        tourDateEl.innerText = `วันแข่งขัน: ${date.toLocaleDateString()} เวลา ${date.toLocaleTimeString()}`;
+      }
+    }
+
+    async function loadRegistrations() {
+  try {
+    const snapshot = await db.collection("registrations")
+      .where("tourId", "==", tourId)
+      .get();
+
+    console.log("Total docs found:", snapshot.size);
+
+    if (snapshot.empty) {
+      tbody.innerHTML = `<tr><td colspan="4">ยังไม่มีผู้สมัคร</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = "";
+    snapshot.forEach(doc => {
+      const r = doc.data();
+      console.log("REG DATA", r);
+
+      const created = r.createdAt?.toDate?.().toLocaleString?.() || "-";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${r.name || "-"}</td>
+        <td>${r.status || "-"}</td>
+        <td>${created}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error("Error loading registrations:", err);
+    tbody.innerHTML = `<tr><td colspan="4">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+  }
+}
+
+
+    loadTourInfo();
+    loadRegistrations();
+  </script>
+</body>
+</html>

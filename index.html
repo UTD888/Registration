@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>LUXU TOURNAMENT REGISTRATION</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    button {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-detail { background: #007bff; color: white; }
+    .btn-register { background: #28a745; color: white; }
+    #registerPopup {
+      position: fixed;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: white; padding: 20px;
+      border: 1px solid #ccc;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      display: none;
+      width: 300px;
+      z-index: 1000;
+    }
+    #registerPopup input {
+      width: 100%; margin-bottom: 10px;
+      padding: 8px; box-sizing: border-box;
+    }
+    #overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none; z-index: 999;
+    }
+    #previewImg { max-width: 100%; margin-bottom: 10px; }
+    #popupQR {
+      max-width: 180px;
+      height: auto;
+      display: block;
+      margin: 10px auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>Now Available Registration</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tournament</th>
+        <th>Close in</th>
+        <th>More</th>
+      </tr>
+    </thead>
+    <tbody id="tourTableBody">
+      <tr><td colspan="3">กำลังโหลด...</td></tr>
+    </tbody>
+  </table>
+
+  <div id="overlay"></div>
+  <div id="registerPopup">
+    <h4>สมัครเข้าร่วม</h4>
+    <div id="popupTourName"></div>
+    <img id="popupQR" src="" alt="QR Code">
+    <input type="text" id="regName" placeholder="ชื่อผู้สมัคร (บังคับ)">
+    <input type="text" id="regPhone" placeholder="เบอร์โทร (ไม่บังคับ)">
+    <input type="file" id="regSlip" accept="image/*">
+    <img id="previewImg" src="" alt="">
+    <button onclick="confirmRegister()">ยืนยัน</button>
+    <button onclick="closePopup()">ยกเลิก</button>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAxB3tZKz-WiEI_kqOP5hTA6gVgpznx3ck",
+      authDomain: "registertour-cd779.firebaseapp.com",
+      projectId: "registertour-cd779",
+      storageBucket: "registertour-cd779.appspot.com"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    let currentTourId = "";
+    let currentTourName = "";
+    let currentQR = "";
+
+    function updateCountdown(rowId, endTime) {
+      const countdownEl = document.getElementById(`countdown-${rowId}`);
+      function tick() {
+        const now = new Date();
+        const diff = new Date(endTime) - now;
+        if (diff <= 0) {
+          countdownEl.innerText = "ปิดรับสมัครแล้ว";
+          countdownEl.style.color = "red";
+          return;
+        }
+        const hours = Math.floor(diff / 1000 / 60 / 60);
+        const mins = Math.floor((diff / 1000 / 60) % 60);
+        const secs = Math.floor((diff / 1000) % 60);
+        countdownEl.innerText = `${hours} ชม ${mins} นาที ${secs} วิ`;
+        setTimeout(tick, 1000);
+      }
+      tick();
+    }
+
+    function loadConfirmedTournaments() {
+      const tbody = document.getElementById("tourTableBody");
+
+      db.collection("tournaments")
+        .where("status", "==", "Open")
+        .orderBy("regEnd", "asc")
+        .onSnapshot(snapshot => {
+          if (snapshot.empty) {
+            tbody.innerHTML = `<tr><td colspan='3'>ไม่มีทัวร์นาเมนต์ที่กำลังเปิดรับสมัคร</td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = "";
+          snapshot.forEach((doc, i) => {
+            const t = doc.data();
+            const rowId = `row${doc.id}`; // ใช้ doc.id แทน index เพื่อความ unique
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+<tr>
+  <td>${t.name}</td>
+  <td id="countdown-${rowId}">-</td>
+  <td>
+    <button class="btn-detail" onclick="window.open('detail.html?id=${doc.id}', '_blank')">info</button>
+    <button class="btn-register" onclick="openPopup('${doc.id}', '${t.name}', '${t.qrcodeUrl || ''}')">Register</button>
+    <button class="btn-register" id="btn-applicants-${rowId}" style="background:#ff9800" onclick="window.open('applicants.html?id=${doc.id}', '_blank')">Players</button>
+  </td>
+</tr>
+`;
+            tbody.appendChild(tr);
+updateCountdown(rowId, t.regEnd.toDate());
+listenToRegistrationCount(doc.id, `btn-applicants-${rowId}`);
+
+          });
+        });
+    }
+
+    function openPopup(id, name, qrUrl) {
+      currentTourId = id;
+      currentTourName = name;
+      currentQR = qrUrl;
+      document.getElementById("popupTourName").innerText = name;
+      document.getElementById("popupQR").src = qrUrl;
+      document.getElementById("regName").value = "";
+      document.getElementById("regPhone").value = "";
+      document.getElementById("regSlip").value = "";
+      document.getElementById("previewImg").src = "";
+      document.getElementById("overlay").style.display = "block";
+      document.getElementById("registerPopup").style.display = "block";
+    }
+
+    function closePopup() {
+      document.getElementById("overlay").style.display = "none";
+      document.getElementById("registerPopup").style.display = "none";
+    }
+
+    document.getElementById("regSlip").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          document.getElementById("previewImg").src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    async function confirmRegister() {
+  const name = document.getElementById("regName").value.trim();
+  const phone = document.getElementById("regPhone").value.trim();
+  const file = document.getElementById("regSlip").files[0];
+
+  if (!name || !file) return alert("กรุณากรอกชื่อ และอัปโหลดสลิป");
+
+  // ✅ เช็คชื่อซ้ำก่อนสมัคร
+  const existing = await db.collection("registrations")
+    .where("tourId", "==", currentTourId)
+    .where("name", "==", name)
+    .get();
+
+  if (!existing.empty) {
+    alert(`ชื่อ "${name}" ได้สมัครทัวร์นี้แล้ว`);
+    return;
+  }
+
+  const confirmOK = confirm(`โปรดยืนยันการสมัครเข้าร่วม ${currentTourName}`);
+  if (!confirmOK) return;
+
+  const formData = new FormData();
+  formData.append("key", "9558962805185271b57918df4e218713");
+  formData.append("image", file);
+
+  try {
+    const res = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error("ไม่สามารถอัปโหลดภาพได้");
+
+    const slipUrl = data.data.url;
+
+    await db.collection("registrations").add({
+      name,
+      phone,
+      tourId: currentTourId,
+      slipUrl: slipUrl,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status: "waiting"
+    });
+
+    alert("สมัครสำเร็จและอัปโหลดสลิปเรียบร้อย ✅");
+    closePopup();
+
+  } catch (err) {
+    alert("เกิดข้อผิดพลาด: " + err.message);
+  }
+}
+
+    loadConfirmedTournaments();
+
+    function listenToRegistrationCount(tourId, btnId) {
+  db.collection("registrations")
+    .where("tourId", "==", tourId)
+    .onSnapshot(snapshot => {
+      const count = snapshot.size;
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.innerText = `Players (${count})`;
+      }
+    });
+}
+
+  </script>
+</body>
+</html>

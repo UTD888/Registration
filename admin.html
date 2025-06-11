@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin setting</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
+
+  <style>
+  body {
+    font-family: 'Sarabun', sans-serif;
+    max-width: 700px;
+    margin: auto;
+    padding: 30px;
+    text-align: center;
+    align-items: center;
+  }
+
+  .hidden { display: none; }
+
+  .admin-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #333;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    margin-bottom: 30px;
+  }
+
+  .admin-bar button {
+    background: red;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+  }
+
+  .form-group {
+    margin-bottom: 15px;
+  }
+
+  .form-group label {
+    font-weight: bold;
+    display: block;
+  }
+
+  .row-group {
+    display: flex;
+    gap: 10px;
+  }
+
+  .row-group .form-group {
+    flex: 1;
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+
+  button {
+    padding: 12px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+  }
+
+  button:hover {
+    background-color: #0056b3;
+  }
+
+  .btn-red {
+    background-color: #dc3545;
+  }
+
+  .btn-red:hover {
+    background-color: #b02a37;
+  }
+
+  .error {
+    color: red;
+    margin-top: 10px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+  }
+
+  th, td {
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  th {
+    background-color: #f2f2f2;
+    font-weight: 600;
+  }
+
+  tr:hover {
+    background-color: #f9f9f9;
+  }
+
+  #tournamentList table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  #tournamentList thead {
+    background-color: #f0f0f0;
+  }
+
+  .dialog-box {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    max-width: 100%;
+  }
+
+  .dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .slip-thumb {
+    width: 60px;
+    cursor: zoom-in;
+    border: 1px solid #ccc;
+  }
+
+  #slipPreviewBox {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+
+  #slipPreviewBox img {
+    max-width: 90%;
+    max-height: 90%;
+    border: 5px solid white;
+    border-radius: 10px;
+    box-shadow: 0 0 15px black;
+  }
+
+  .gear-icon {
+    width: 20px;
+    height: 20px;
+    margin-left: 5px;
+    vertical-align: middle;
+    cursor: pointer;
+  }
+</style>
+
+</head>
+<body>
+
+  <div id="loginBox">
+    <h2>เข้าสู่ระบบ Admin</h2>
+    <input type="email" id="email" placeholder="อีเมล">
+    <input type="password" id="password" placeholder="รหัสผ่าน">
+    <button onclick="login()">เข้าสู่ระบบ</button>
+    <div id="errorMsg" class="error"></div>
+  </div>
+
+  <div id="adminPanel" class="hidden">
+    <div class="admin-bar">
+      <div id="userEmail">admin@luxu.com</div>
+      <button onclick="logout()">ออกจากระบบ</button>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        
+  <button onclick="toggleForm()">➕ Tournament</button>
+  <button onclick="toggleTournaments()">📋 Manage Tour</button>
+  <button onclick="togglePlayers()">👥 Manage Player</button>
+  
+</div>
+<div id="tournamentList" class="hidden" style="margin-top: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <h3 style="margin: 0;">📋 รายการทัวร์ทั้งหมด</h3>
+    <button onclick="closeTournamentList()" style="font-size: 18px; background: none; border: none; cursor: pointer;">❌</button>
+  </div>
+
+  <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
+    <thead>
+      <tr style="background-color: #f2f2f2;">
+        <th style="padding: 5px;border-bottom: 1px solid #ddd;">#</th>
+        <th style="padding: 5px; border-bottom: 1px solid #ddd;">ชื่อทัวร์</th>
+        <th style="padding: 5px;border-bottom: 1px solid #ddd;">ประเภท</th>
+        <th style="padding: 5px; border-bottom: 1px solid #ddd;">วันแข่ง</th>
+        <th style="padding: 5px; border-bottom: 1px solid #ddd;">Buy-in</th>
+        <th style="padding: 5px; border-bottom: 1px solid #ddd;">Guarantee</th>
+        <th style="padding: 5px; border-bottom: 1px solid #ddd;">สถานะ</th>
+      </tr>
+    </thead>
+    <tbody id="tourTableBody">
+      <tr>
+        <td colspan="7" style="padding: 12px; text-align: center; color: #888;">กำลังโหลด...</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<div id="playerTourList" class="hidden" style="margin-top: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <h3 style="margin: 0;">จัดการผู้เล่น</h3>
+    <button onclick="closePlayerTourList()" style="font-size: 18px; background: none; border: none; cursor: pointer;">❌</button>
+  </div>
+
+  <table border="1" width="100%" cellpadding="10">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>ชื่อทัวร์</th>
+        <th>การจัดการ</th>
+      </tr>
+    </thead>
+    <tbody id="playerTourTableBody">
+      <tr><td colspan="3">กำลังโหลด...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+
+<div id="tournamentList" class="hidden" style="margin-top: 20px;"></div>
+    
+<div id="tourForm" class="hidden">
+      <h2>ฟอร์มตั้งค่าทัวร์นาเมนต์</h2>
+      <div class="form-group">
+        <label class="required">ชื่อทัวร์นาเมนต์</label>
+        <input type="text" id="tourName">
+      </div>
+
+      <div class="form-group">
+        <label class="required">ประเภทการแข่งขัน</label>
+        <select id="tourType">
+          <option value="">-- กรุณาเลือก --</option>
+          <option value="Tour">Tour</option>
+          <option value="Bounty">Bounty</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="required">วันและเวลาการแข่งขัน</label>
+        <input type="datetime-local" id="tourDateTime">
+      </div>
+
+      <div class="row-group">
+        <div class="form-group">
+          <label class="required">Buy-in (บาท)</label>
+          <input type="number" id="buyin">
+        </div>
+        <div class="form-group">
+          <label class="required">Guarantee (บาท)</label>
+          <input type="number" id="guarantee">
+        </div>
+      </div>
+
+      <div class="form-group">
+  <label class="required">อัปโหลด QR Code ค่าสมัคร</label>
+  <input type="file" id="qrImage" accept="image/*">
+  <img id="qrPreview" style="max-width: 100%; margin-top: 5px; display: none;">
+</div>
+
+
+      <div class="form-group">
+  <label class="required">รายละเอียดทัวร์นาเมนต์</label>
+  <textarea id="tourDetail" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></textarea>
+</div>
+
+<div class="form-group">
+  <label>📎 อัปโหลด Poster (ไม่บังคับ)</label>
+  <input type="file" id="posterImage" accept="image/*">
+  <img id="posterPreview" style="max-width: 100%; margin-top: 5px; display: none;">
+</div>
+
+
+<div class="form-group">
+  <label>📎 อัปโหลด Structure (ไม่บังคับ)</label>
+  <input type="file" id="structureImage" accept="image/*">
+  <img id="structurePreview" style="max-width: 100%; margin-top: 5px; display: none;">
+</div>
+
+<div class="form-group">
+  <label class="required">วัน/เวลา เริ่มรับสมัคร</label>
+  <input type="datetime-local" id="regStart">
+</div>
+
+<div class="form-group">
+  <label class="required">วัน/เวลา ปิดรับสมัคร</label>
+  <input type="datetime-local" id="regEnd">
+</div>
+    
+<button type="button" onclick="submitTournament()">บันทึกและสร้างทัวร์นาเมนต์</button>
+<button type="button" onclick="closeForm()" style="margin-left: 10px;">❌ ปิด</button>
+</div>
+
+<div id="playerDialog" class="hidden" style="position: relative; background: #fff; padding: 15px 20px; border-radius: 10px; box-shadow: 0 0 12px rgba(0,0,0,0.2); max-width: 800px; margin: auto;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <h3 style="margin: 0; font-size: 20px;">รายชื่อผู้สมัคร</h3>
+    <button onclick="closePlayerDialog()" style="font-size: 18px; background: none; border: none; cursor: pointer;">❌</button>
+  </div>
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <thead style="background: #f0f0f0;">
+        <tr>
+          <th style="padding: 8px;border-bottom: 1px solid #ccc;">ชื่อ</th>
+          <th style="padding: 8px; border-bottom: 1px solid #ccc;">วัน/เวลาที่สมัคร</th>
+          <th style="padding: 8px; border-bottom: 1px solid #ccc;">สลิป</th>
+          <th style="padding: 8px; border-bottom: 1px solid #ccc;">สถานะ</th>
+        </tr>
+      </thead>
+      <tbody id="playerListTable"></tbody>
+    </table>
+  </div>
+</div>
+
+
+
+  </div>
+<div id="slipPreviewBox" onclick="this.style.display='none'">
+  <img id="slipPreviewImg" src="">
+</div>
+
+<div id="statusPopup" class="hidden" style="position:fixed; top:30%; left:50%; transform:translateX(-50%);
+  background:#fff; padding:20px; border:1px solid #ccc; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.2); z-index:9999;">
+  <p id="statusPopupName" style="margin-bottom:10px;">จัดการสถานะ:</p>
+  <button onclick="setStatusRegistered()">✅ Registered</button>
+  <button onclick="confirmDelete()">🗑️ Delete</button>
+  <br><br>
+  <button onclick="closeStatusPopup()">❌ ยกเลิก</button>
+</div>
+
+  <script>
+  let currentRegId = "";
+let currentRegName = "";
+let lastTourId = "";
+let lastTourName = "";
+
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAxB3tZKz-WiEI_kqOP5hTA6gVgpznx3ck",
+      authDomain: "registertour-cd779.firebaseapp.com",
+      projectId: "registertour-cd779"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    firebase.auth().onAuthStateChanged(user => {
+  if (user) {
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("adminPanel").classList.remove("hidden");
+    document.getElementById("userEmail").innerText = user.email;
+
+autoCloseExpiredTournaments(); // ✅ ตรวจสอบหมดเวลา
+    loadTournaments(); // โหลดล่วงหน้า
+    tourListLoaded = true;
+  } else {
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("adminPanel").classList.add("hidden");
+  }
+});
+
+
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      const errorBox = document.getElementById("errorMsg");
+
+      firebase.auth().signInWithEmailAndPassword(email, password)
+        .then(() => location.reload())
+        .catch(error => {
+          errorBox.innerText = "เข้าสู่ระบบไม่สำเร็จ: " + error.message;
+        });
+    }
+
+    function logout() {
+      firebase.auth().signOut().then(() => location.reload());
+    }
+
+    function toggleForm() {
+      const form = document.getElementById("tourForm");
+      form.classList.toggle("hidden");
+    }
+
+    
+
+    async function loadTournaments() {
+  const tbody = document.getElementById("tourTableBody");
+  const snap = await db.collection("tournaments")
+    .orderBy("createdAt", "desc")
+    .get();
+
+  if (snap.empty) {
+    tbody.innerHTML = `<tr><td colspan="6">ไม่มีข้อมูลทัวร์นาเมนต์</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = "";
+
+  snap.docs.forEach((doc, index) => {
+    const tour = doc.data();
+    const row = document.createElement("tr");
+
+    // ตรวจสอบสถานะเพื่อแสดงผลลัพธ์
+    const statusText = tour.status === "Open" ? "🟢 Running" :
+                       tour.status === "Paused" ? "⏸ Pause" :
+                       tour.status === "Closed" ? "🔴 Closed" : "⏳ รอดำเนินการ";
+
+    // สร้างปุ่มตามสถานะ
+    let actionButtons = "";
+    if (tour.status === "Pending" || !tour.status) {
+      actionButtons = `<button onclick="confirmTournament('${doc.id}')">✅ ยืนยันทัวร์</button>`;
+    } else if (tour.status === "Open") {
+      actionButtons = `
+        <span>${statusText}</span>
+        <button onclick="pauseTournament('${doc.id}')">⏸ Pause</button>
+      `;
+    } else if (tour.status === "Paused") {
+      actionButtons = `
+        <span>${statusText}</span>
+        <button onclick="resumeTournament('${doc.id}')">▶️ เปิดใหม่</button>
+      `;
+    } else {
+      actionButtons = `<span>${statusText}</span>`;
+    }
+
+    // เติมข้อมูลแถว
+    
+    row.innerHTML = `
+      <td>${index + 1}</td>
+      <td>${tour.name}</td>
+      <td>${tour.type || "-"}</td>
+      <td>${tour.datetime ? new Date(tour.datetime).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", calendar: "gregory" }) : "-"}</td>
+      <td>${tour.buyin || "-"}</td>
+      <td>${tour.guarantee || "-"}</td>
+      <td>${actionButtons}</td>
+    `;
+
+    tbody.appendChild(row);
+  });
+}
+async function confirmTournament(id) {
+  const ok = confirm("ต้องการเปิดรับสมัครทัวร์นี้หรือไม่?");
+  if (!ok) return;
+
+  await db.collection("tournaments").doc(id).update({
+    status: "Open",
+    confirmed: true
+  });
+
+  alert("สถานะทัวร์: เปิดรับสมัครแล้ว ✅");
+  loadTournaments();
+}
+
+
+
+  async function deleteTournament(id) {
+    if (confirm("ต้องการลบทัวร์นี้หรือไม่?")) {
+      await db.collection("tournaments").doc(id).delete();
+      alert("ลบทัวร์นาเมนต์แล้ว");
+      loadTournaments();
+    }
+  }
+
+async function editTournament(id) {
+  const doc = await db.collection("tournaments").doc(id).get();
+  if (!doc.exists) return;
+  const tour = doc.data();
+
+  document.getElementById("tourForm").setAttribute("data-edit-id", id);
+  document.getElementById("tourForm").classList.remove("hidden");
+
+  document.getElementById("tourName").value = tour.name;
+  document.getElementById("tourType").value = tour.type;
+  document.getElementById("tourDateTime").value = tour.datetime;
+  document.getElementById("buyin").value = tour.buyin;
+  document.getElementById("guarantee").value = tour.guarantee || "";
+  document.getElementById("tourDetail").value = tour.tourDetail || "";
+  document.getElementById("regStart").value = tour.regStart
+  ? new Date(tour.regStart.seconds * 1000 - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0,16)
+  : "";
+
+document.getElementById("regEnd").value = tour.regEnd
+  ? new Date(tour.regEnd.seconds * 1000 - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0,16)
+  : "";
+
+  document.getElementById("qrPreview").src = tour.qrcodeUrl;
+document.getElementById("qrPreview").style.display = "block";
+
+document.getElementById("posterPreview").src = tour.posterUrl;
+document.getElementById("posterPreview").style.display = "block";
+
+document.getElementById("structurePreview").src = tour.structureUrl;
+document.getElementById("structurePreview").style.display = "block";
+
+
+  // Save preview URLs for old images
+  if (tour.qrcodeUrl) {
+    document.getElementById("qrImage").dataset.url = tour.qrcodeUrl;
+  }
+  if (tour.posterUrl) {
+    document.getElementById("posterImage").dataset.url = tour.posterUrl;
+  }
+  if (tour.structureUrl) {
+    document.getElementById("structureImage").dataset.url = tour.structureUrl;
+  }
+
+  // Optional: Show previews (only if needed visually)
+  console.log("QR Preview:", tour.qrcodeUrl);
+  console.log("Poster Preview:", tour.posterUrl);
+  console.log("Structure Preview:", tour.structureUrl);
+}
+async function uploadImageToImgbb(file) {
+  const formData = new FormData();
+  formData.append("key", "9558962805185271b57918df4e218713");
+  formData.append("image", file);
+  const res = await fetch("https://api.imgbb.com/1/upload", {
+    method: "POST",
+    body: formData
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error("Upload failed");
+  return data.data.url;
+}
+
+async function submitTournament() {
+  const id = document.getElementById("tourForm").getAttribute("data-edit-id");
+  const name = document.getElementById("tourName").value.trim();
+  const type = document.getElementById("tourType").value;
+  const datetime = document.getElementById("tourDateTime").value;
+  const buyin = document.getElementById("buyin").value;
+  const guarantee = document.getElementById("guarantee").value;
+  const detail = document.getElementById("tourDetail").value;
+  const regStart = document.getElementById("regStart").value;
+  const regEnd = document.getElementById("regEnd").value;
+  const qrFile = document.getElementById("qrImage").files[0];
+  const posterFile = document.getElementById("posterImage").files[0];
+  const structureFile = document.getElementById("structureImage").files[0];
+
+  if (!name || !type || !datetime || !buyin || !detail || !regStart || !regEnd) {
+    alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+    return;
+  }
+
+  let qrcodeUrl = document.getElementById("qrImage").dataset.url || "";
+  let posterUrl = document.getElementById("posterImage").dataset.url || "";
+  let structureUrl = document.getElementById("structureImage").dataset.url || "";
+
+  if (qrFile) qrcodeUrl = await uploadImageToImgbb(qrFile);
+  if (posterFile) posterUrl = await uploadImageToImgbb(posterFile);
+  if (structureFile) structureUrl = await uploadImageToImgbb(structureFile);
+
+  const payload = {
+    name,
+    type,
+    datetime,
+    buyin: parseInt(buyin),
+    guarantee: guarantee ? parseInt(guarantee) : null,
+    qrcodeUrl,
+    tourDetail: detail,
+    posterUrl,
+    structureUrl,
+    regStart: new Date(regStart),
+    regEnd: new Date(regEnd),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    owner: firebase.auth().currentUser.uid
+  };
+
+  if (id) {
+    await db.collection("tournaments").doc(id).update(payload);
+    alert("อัปเดตทัวร์เรียบร้อยแล้ว");
+  } else {
+    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    await db.collection("tournaments").add(payload);
+    alert("สร้างทัวร์นาเมนต์ใหม่เรียบร้อยแล้ว");
+  }
+
+  document.getElementById("tourForm").reset();
+  document.getElementById("tourForm").classList.add("hidden");
+  document.getElementById("tourForm").removeAttribute("data-edit-id");
+}
+
+function toggleTournaments() {
+  const container = document.getElementById("tournamentList");
+  const isHidden = container.classList.contains("hidden");
+
+  if (isHidden) {
+    container.classList.remove("hidden");
+    loadTournaments(); // โหลดเมื่อเปิด
+  } else {
+    container.classList.add("hidden");
+  }
+}
+
+function closeForm() {
+  document.getElementById("tourForm").classList.add("hidden");
+  document.getElementById("tourForm").removeAttribute("data-edit-id");
+  document.getElementById("tourForm").reset();
+  document.getElementById("qrPreview").style.display = "none";
+  document.getElementById("posterPreview").style.display = "none";
+  document.getElementById("structurePreview").style.display = "none";
+}
+function autoCloseExpiredTournaments() {
+  db.collection("tournaments")
+    .where("confirmed", "==", true)
+    .get()
+    .then(snapshot => {
+      const now = new Date();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.regEnd?.toDate() <= now) {
+          db.collection("tournaments").doc(doc.id).update({
+            confirmed: false,
+            status: "Closed"
+          });
+        }
+      });
+    });
+}
+
+async function pauseTournament(id) {
+  const ok = confirm("ต้องการหยุดรับสมัครทัวร์นี้ชั่วคราวหรือไม่?");
+  if (!ok) return;
+
+  await db.collection("tournaments").doc(id).update({
+    status: "Paused"
+  });
+
+  alert("หยุดรับสมัครชั่วคราวแล้ว");
+  loadTournaments();
+}
+
+async function resumeTournament(id) {
+  const ok = confirm("ต้องการเปิดรับสมัครทัวร์นี้อีกครั้งหรือไม่?");
+  if (!ok) return;
+
+  await db.collection("tournaments").doc(id).update({
+    status: "Open"
+  });
+
+  alert("เปิดรับสมัครอีกครั้งแล้ว");
+  loadTournaments();
+}
+const formatDate = (val) =>
+  val ? new Date(val).toLocaleString("th-TH", {
+    dateStyle: "short",
+    timeStyle: "short",
+    calendar: "gregory"
+  }) : "-";
+
+  function togglePlayers() {
+  const container = document.getElementById("playerTourList");
+  const isHidden = container.classList.contains("hidden");
+  if (isHidden) {
+    container.classList.remove("hidden");
+    loadPlayerTournaments();
+  } else {
+    container.classList.add("hidden");
+  }
+}
+
+async function loadPlayerTournaments() {
+  const tbody = document.getElementById("playerTourTableBody");
+  const regSnap = await db.collection("registrations").get();
+  const tourIds = [...new Set(regSnap.docs.map(doc => doc.data().tourId))];
+
+  if (tourIds.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3">ยังไม่มีผู้สมัครในระบบ</td></tr>`;
+    return;
+  }
+
+  const tourSnap = await db.collection("tournaments").where(firebase.firestore.FieldPath.documentId(), "in", tourIds).get();
+
+  tbody.innerHTML = "";
+  tourSnap.docs.forEach((doc, i) => {
+    const tour = doc.data();
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${tour.name}</td>
+      <td><button onclick="showPlayers('${doc.id}', '${tour.name}')">Manage</button></td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+let unsubscribePlayers = null; // สำหรับยกเลิก listener เดิมเมื่อเปลี่ยนทัวร์
+
+async function showPlayers(tourId, tourName) {
+  lastTourId = tourId;
+  lastTourName = tourName;
+
+  // ถ้ามี listener เก่า ให้ยกเลิกก่อน
+  if (unsubscribePlayers) unsubscribePlayers();
+
+  const tbody = document.getElementById("playerListTable");
+  document.getElementById("playerDialog").classList.remove("hidden");
+  tbody.innerHTML = "<tr><td colspan='4'>กำลังโหลด...</td></tr>";
+
+  unsubscribePlayers = db.collection("registrations")
+    .where("tourId", "==", tourId)
+    .onSnapshot((snapshot) => {
+      tbody.innerHTML = "";
+      if (snapshot.empty) {
+        tbody.innerHTML = "<tr><td colspan='4'>ยังไม่มีผู้สมัคร</td></tr>";
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${d.name}</td>
+          <td>${d.createdAt?.toDate().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", calendar: "gregory" }) || "-"}</td>
+          <td><img src="${d.slipUrl}" class="slip-thumb" onclick="previewSlip('${d.slipUrl}')"></td>
+          <td>
+            ${d.status === "Registered" ? "✅ Registered" : "⏳ รอยืนยัน"}
+            <img src="gear.png" class="gear-icon" onclick="openStatusPopup('${doc.id}', '${d.name}', '${d.status}')">
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
+}
+
+
+
+function previewSlip(url) {
+  const box = document.getElementById("slipPreviewBox");
+  const img = document.getElementById("slipPreviewImg");
+  img.src = url;
+  box.style.display = "flex";
+}
+
+async function handleStatus(name, regId) {
+  const choice = prompt(`จัดการสถานะของ ${name}\n\nพิมพ์:\n1 = ยืนยัน\n2 = ลบ`);
+
+  if (choice === "1") {
+    await db.collection("registrations").doc(regId).update({ status: "Registered" });
+    alert(`✅ เปลี่ยนสถานะของ ${name} เป็น Registered แล้ว`);
+    location.reload();
+  } else if (choice === "2") {
+    const confirmDel = confirm(`คุณต้องการลบผู้สมัคร ${name} ใช่หรือไม่?`);
+    if (confirmDel) {
+      await db.collection("registrations").doc(regId).delete();
+      alert(`🗑️ ลบข้อมูลของ ${name} เรียบร้อยแล้ว`);
+      location.reload();
+    }
+  }
+}
+function openStatusPopup(regId, name) {
+  currentRegId = regId;
+  currentRegName = name;
+  document.getElementById("statusPopupName").innerText = `จัดการสถานะ: ${name}`;
+  document.getElementById("statusPopup").classList.remove("hidden");
+}
+
+function closeStatusPopup() {
+  document.getElementById("statusPopup").classList.add("hidden");
+  currentRegId = "";
+  currentRegName = "";
+}
+
+async function setStatusRegistered() {
+  if (!currentRegId) return;
+  await db.collection("registrations").doc(currentRegId).update({ status: "Registered" });
+  alert(`เปลี่ยนสถานะของ ${currentRegName} เป็น Registered แล้ว`);
+  closeStatusPopup();
+  document.getElementById("playerDialog").classList.remove("hidden");
+  showPlayers(lastTourId, lastTourName);
+}
+
+
+async function confirmDelete() {
+  const ok = confirm(`คุณต้องการลบผู้สมัคร ${currentRegName} ใช่ไหม?`);
+  if (!ok) return;
+  await db.collection("registrations").doc(currentRegId).delete();
+  alert(`ลบ ${currentRegName} เรียบร้อยแล้ว`);
+  closeStatusPopup();
+  document.getElementById("playerDialog").classList.remove("hidden");
+  showPlayers(lastTourId, lastTourName);
+}
+
+
+function closePlayerDialog() {
+  document.getElementById("playerDialog").classList.add("hidden");
+}
+
+function closeTournamentList() {
+  document.getElementById("tournamentList").classList.add("hidden");
+}
+function closePlayerTourList() {
+  document.getElementById("playerTourList").classList.add("hidden");
+}
+  function closeForm() {
+    document.getElementById("tourForm").classList.add("hidden");
+
+    const inputs = document.querySelectorAll("#tourForm input, #tourForm textarea");
+    inputs.forEach(input => {
+      if (input.type === "file") {
+        input.value = null;
+      } else {
+        input.value = "";
+      }
+    });
+
+    document.getElementById("qrPreview").style.display = "none";
+    document.getElementById("posterPreview").style.display = "none";
+    document.getElementById("structurePreview").style.display = "none";
+  }
+
+
+  </script>
+</body>
+</html>

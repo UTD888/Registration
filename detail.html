@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Tournament info</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 700px;
+      margin: auto;
+      padding: 20px;
+    }
+    h2 {
+      text-align: center;
+    }
+    .info {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+    .info img {
+      max-width: 100%;
+      margin-top: 10px;
+    }
+    .label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h2>Tournament info</h2>
+  <div class="info" id="tourDetail">กำลังโหลดข้อมูล...</div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAxB3tZKz-WiEI_kqOP5hTA6gVgpznx3ck",
+      authDomain: "registertour-cd779.firebaseapp.com",
+      projectId: "registertour-cd779"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const params = new URLSearchParams(window.location.search);
+    const tourId = params.get("id");
+    const box = document.getElementById("tourDetail");
+
+    if (!tourId) {
+      box.innerText = "ไม่พบรหัสทัวร์นาเมนต์";
+    } else {
+      db.collection("tournaments").doc(tourId).get().then(doc => {
+        if (!doc.exists) {
+          box.innerText = "ไม่พบทัวร์นาเมนต์นี้ในระบบ";
+          return;
+        }
+
+        const t = doc.data();
+        const formatDate = (val) =>
+  val ? new Date(val).toLocaleString("th-TH", {
+    dateStyle: "short",
+    timeStyle: "short",
+    calendar: "gregory"
+  }) : "-";
+
+
+        box.innerHTML = `
+          <div><span class="label">ชื่อ:</span> ${t.name}</div>
+          <div><span class="label">ประเภท:</span> ${t.type || "-"}</div>
+          <div><span class="label">วันแข่งขัน:</span> ${formatDate(t.datetime)}</div>
+          <div><span class="label">ปิดรับสมัคร ล่วงหน้า:</span> ${t.regEnd?.toDate ? formatDate(t.regEnd.toDate()) : "-"}</div>
+          <div><span class="label">Buy-in:</span> ${t.buyin || "-"}</div>
+          <div><span class="label">Guarantee:</span> ${t.guarantee || "-"}</div>
+          <div><span class="label">รายละเอียด:</span><br>${t.tourDetail?.replaceAll("\n", "<br>") || "-"}</div>
+          ${t.posterUrl ? `<div><span class="label">โปสเตอร์:</span><br><img src="${t.posterUrl}" alt="Poster"></div>` : ""}
+          ${t.structureUrl ? `<div><span class="label">Structure:</span><br><img src="${t.structureUrl}" alt="Structure"></div>` : ""}
+        `;
+      });
+    }
+  </script>
+</body>
+</html>
